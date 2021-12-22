@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: horizon-esi
+  labels:
+    app: horizon-esi
+spec:
+  replicas: 1
+  revisionHistoryLimit: 1
+  selector:
+    matchLabels:
+      app: horizon-esi
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+  minReadySeconds: 5
+  template:
+    metadata:
+      labels:
+        app: horizon-esi
+    spec:
+      containers:
+        - name: horizon-esi
+          image: <IMAGE>
+          env:
+            - name: CONFIG_OVERRIDE
+              valueFrom:
+                secretKeyRef:
+                  name: horizon-esi-secrets
+                  key: config-override
+            - name: PGHOST
+              value: postgres-service
+            - name: ESIDATABASE
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secrets
+                  key: postgres-db
+            - name: ESIPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secrets
+                  key: esi-password
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: 100m
+            limits:
+              cpu: 100m
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: horizon-esi-service
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      protocol: TCP
+      port: 80
+      targetPort: 3000
+  selector:
+    app: horizon-esi

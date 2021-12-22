@@ -1,0 +1,20 @@
+{
+  "development": {
+    "esi": {
+      "swagger_url": "http://localhost:3000/swagger.json"
+    },
+    "cachedb": {
+      "database": "horizon",
+      "user": "esi",
+      "password": "esi",
+      "schema": "esi",
+      "host": "localhost",
+      "port": 5432
+    }
+  },
+  "production": {
+    "esi": {
+      "swagger_url": "https://esi.evetech.net/latest/swagger.json"
+    }
+  }
+}
