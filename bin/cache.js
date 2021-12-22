@@ -32,7 +32,7 @@ pool.connect(function(err, client, release) {
 })
 
 pool.on('connect', function(client) {
-    client.query('SET search_path TO ' + cfg.cache.schema)
+    client.query('SET search_path TO ' + cfg.cachedb.schema)
 })
 
 function abortOnError (err, client, done) {
@@ -76,6 +76,7 @@ function execute(query, params) {
     pool.connect(function(err, client, done) {
         client.query(query, params, function(err) {
             if (err) console.error('Error executing query ' + query + ', params: ' + params, err.stack)
+            client.release()
             return done()
         })
     })
