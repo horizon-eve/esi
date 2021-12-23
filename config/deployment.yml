@@ -41,6 +41,11 @@ spec:
                 secretKeyRef:
                   name: postgres-secrets
                   key: esi-password
+            - name: ESI_CACHE_SCHEMA
+              valueFrom:
+                secretKeyRef:
+                  name: horizon-esi-secrets
+                  key: cache-schema
           ports:
             - containerPort: 80
           resources:
