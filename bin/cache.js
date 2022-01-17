@@ -82,7 +82,34 @@ function execute(query, params) {
     })
 }
 
-function update(op, api, params, data) {
+/**
+ * date = "Mon, 17 Jan 2022 18:40:25 GMT"
+ content-type = "application/json; charset=UTF-8"
+ content-length = "175"
+ connection = "close"
+ access-control-allow-credentials = "true"
+ access-control-allow-headers = "Content-Type,Authorization,If-None-Match,X-User-Agent"
+ access-control-allow-methods = "GET,HEAD,OPTIONS"
+ access-control-allow-origin = "*"
+ access-control-expose-headers = "Content-Type,Warning,ETag,X-Pages,X-ESI-Error-Limit-Remain,X-ESI-Error-Limit-Reset"
+ access-control-max-age = "600"
+ allow = "GET,HEAD,OPTIONS"
+ cache-control = "public"
+ etag = ""3f6fa85bb1f2215236622bb41a4feb3ee43dd690759c62ef244c79ea""
+ expires = "Tue, 18 Jan 2022 16:54:06 GMT"
+ last-modified = "Mon, 17 Jan 2022 16:54:06 GMT"
+ strict-transport-security = "max-age=31536000"
+ x-esi-error-limit-remain = "100"
+ x-esi-error-limit-reset = "35"
+ x-esi-request-id = "28a9e8a6-1663-48f5-a2f1-c6c1a9ac70c3"
+ * @param op
+ * @param api
+ * @param params
+ * @param data
+ * @param client
+ * @param response
+ */
+function update(op, api, params, data, client, res) {
     var ddl = mapping.operations[op]
     var stmts = []
     // delete old data
@@ -92,7 +119,77 @@ function update(op, api, params, data) {
     stmt_insert(ddl, params, data,function (sql, p) {
         stmts.push({sql: sql, params: p})
     })
-    executeTransaction(stmts)
+    // insert into history
+    const now = new Date()
+    const cached_ms = api['x-cached-seconds'] ? api['x-cached-seconds'] * 1000 : 0
+    const headers = res.headers
+    const expires = new Date(now.getTime() + cached_ms)
+    stmts.push({sql: `INSERT INTO ESI.ESI_CALL_HISTORY (RESOURCE_KEY, OPERATION_ID, ETAG, ESI_REQUEST_ID,
+                                                        ERROR_LIMIT_REMAINING, ERROR_LIMIT_RESET, STATUS, EXPIRES, LOGGED)
+                      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`
+        , params: [resource_key(api, params),
+            op,
+            headers['etag'],
+            headers['x-esi-request-id'],
+            headers['x-esi-error-limit-remain'],
+            headers['x-esi-error-limit-reset'],
+            res.statusCode,
+            expires,
+            now] })
+
+    executeTransaction(stmts, client)
+}
+
+function resource_key(api, params) {
+    const ordered = Object.keys(params).sort().reduce(
+      (obj, key) => {
+          obj[key] = params[key];
+          return obj;
+      },
+      {}
+    );
+    return `${api.operationId}-${JSON.stringify(ordered)}`
+}
+
+
+function get(api, params, done) {
+    const sql_params = [resource_key(api, params)]
+    const ddl = `select *
+                 from esi.esi_call_history
+                 where resource_key = $1 AND expires > current_timestamp
+                 order by logged desc
+                 limit 1`
+
+    pool.connect(function (err, client, release) {
+        if (err) {
+            release()
+            return console.error('Error acquiring client', err)
+        }
+        client.query(ddl, sql_params, function (err, res) {
+            if (err) {
+                release()
+                return console.error('could not query cache', err)
+            }
+            if (res.rows && res.rows.length) {
+                const ddl = mapping.operations[api.operationId]
+                let stmt
+
+                stmt_select(ddl, params,function (sql, p) {
+                     stmt = {sql: sql, params: p}
+                })
+
+                client.query(stmt.sql, stmt.params, function(err, res) {
+                    release()
+                    if (err) {
+                        return console.error('could not query cache', err)
+                    }
+                    done(res.rows)
+                })
+            } else {
+                done(null, client)
+            }
+        })
+    })
 }
 
 function stmt_delete(ddl, params, done) {
@@ -129,6 +226,20 @@ function stmt_insert(ddl, params, data, done) {
     done(sql, sql_params)
 }
 
+function stmt_select(ddl, params, done) {
+    const columns = Object.values(ddl.fields)
+
+    const filters = []
+    const sql_params = []
+    Object.keys(params).forEach(field => {
+        filters.push(`${ddl.fields[field]} = $${filters.length +1}`)
+        sql_params.push(params[field])
+    })
+    const where = filters.length ? `WHERE ${filters.join(' AND ')}` : ''
+    const sql = `SELECT ${columns.join(',')} FROM ${cfg.cachedb.schema}.${ddl.table} ${where}`
+    done(sql, sql_params)
+}
+
 function normalize(v) {
     return v === '' ? undefined : v
 }
@@ -136,4 +247,6 @@ function normalize(v) {
 module.exports.executeTransaction = executeTransaction
 module.exports.execute = execute
 module.exports.update = update
+module.exports.get = get
+module.exports.mapping = mapping
 module.exports.connection_pool = pool

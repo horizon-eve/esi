@@ -1,21 +1,17 @@
 var request = require('request')
 var cfg = require('./config')
+const fs = require('fs')
 
 var spec
 var apis = {}
 
-request({
-    url: cfg.esi.swagger_url,
-    json: true
-}, function (error, response, body) {
-    if (error) console.log(error)
-    if (response.statusCode === 200) {
-        reProcessEsiSpec(body)
-    }
-})
+{
+    let file = fs.readFileSync(cfg.esi.swagger_path)
+    reProcessEsiSpec(JSON.parse(file))
+}
 
-function reProcessEsiSpec(body) {
-    spec = body
+function reProcessEsiSpec(content) {
+    spec = content
     var paths = Object.keys(spec.paths)
     paths.forEach(function(p) {
         var path = spec.paths[p]
@@ -24,6 +20,7 @@ function reProcessEsiSpec(body) {
             api.method = method
             api.path = p
             if (apis[api.operationId]) console.log('non unique ESI operationId ' + api.operationId)
+            api.method = method.toLowerCase()
             apis[api.operationId] = api
         })
     })
@@ -43,7 +40,8 @@ function execute(op, params, callback) {
             console.log('response: ' + response)
             return
         }
-        callback(op, api, params, body)
+
+        callback(op, api, params, body, response)
     })
 }
 
@@ -58,3 +56,5 @@ function path_params(path, params) {
 }
 
 module.exports.execute = execute
+module.exports.spec = spec
+module.exports.apis = apis
