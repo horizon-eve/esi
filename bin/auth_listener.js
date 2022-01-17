@@ -11,7 +11,7 @@ cache.connection_pool.connect((err, client, release) => {
         console.log(msg.payload)
         let event = JSON.parse(msg.payload)
         if (event.event === 'character_info') {
-            character_token(event)
+            //character_token(event) REmove later
         }
     })
 })

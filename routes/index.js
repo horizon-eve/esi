@@ -22,7 +22,9 @@ router.delete('/*', cors(corsOptions), function (req, res) {
   process(req, res)
 })
 
-router.options('/*', cors(corsOptions))
+router.options('/*', cors(corsOptions),function(req, res) {
+  res.end()
+})
 
 function process (req, res) {
   res.setHeader('Content-Type', 'application/json')
