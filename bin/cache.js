@@ -183,7 +183,7 @@ function get(api, params, done) {
                     if (err) {
                         return console.error('could not query cache', err)
                     }
-                    done(res.rows)
+                    done(res.rows & res.rows.length ? (res.rows.length === 1 ? res.rows[0] : res.rows) : null)
                 })
             } else {
                 done(null, client)
