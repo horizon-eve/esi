@@ -3,6 +3,10 @@
     "esi": {
       "swagger_path": "swagger.json"
     },
+    "api": {
+      "auth_header": "x-hr-authtoken",
+      "char_header": "x-hr-character"
+    },
     "cachedb": {
       "database": "horizon",
       "user": "esi",
