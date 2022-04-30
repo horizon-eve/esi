@@ -16,6 +16,8 @@ on:
       - '*.js'
       - 'bin/**'
       - 'routes/**'
+      - 'package.json'
+      - 'package-lock.json'
 
 
 
